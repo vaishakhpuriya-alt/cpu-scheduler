@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Process Scheduler</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #2a3555;
+    --accent: #4f8ef7;
+    --accent2: #7c3aed;
+    --green: #10b981;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --p1: #7c3aed; --p2: #059669; --p3: #dc2626; --p4: #2563eb; --p5: #d97706;
+    --p6: #db2777; --p7: #0891b2; --p8: #65a30d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    padding: 2rem 2rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .logo {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  header h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; }
+  header span { font-size: 0.8rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .main { display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: calc(100vh - 80px); }
+
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem;
+    overflow-y: auto;
+  }
+  .section-title {
+    font-size: 0.7rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .algo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.5rem; }
+  .algo-btn {
+    padding: .6rem .5rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+  }
+  .algo-btn:hover { border-color: var(--accent); color: var(--text); }
+  .algo-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+
+  .tq-row { display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem; }
+  .tq-row label { font-size: 0.8rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+  .tq-row input {
+    width: 70px; padding: .4rem .6rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+  }
+  .tq-row input:focus { outline: none; border-color: var(--accent); }
+
+  .proc-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+  .proc-table th {
+    font-size: 0.65rem; font-family: 'JetBrains Mono', monospace;
+    color: var(--muted); text-align: left; padding: .4rem .5rem;
+    border-bottom: 1px solid var(--border); letter-spacing: 1px;
+  }
+  .proc-table td { padding: .3rem .3rem; }
+  .proc-table td input {
+    width: 100%; padding: .35rem .5rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 5px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+    transition: border .15s;
+  }
+  .proc-table td input:focus { outline: none; border-color: var(--accent); }
+  .proc-table .del-btn {
+    width: 26px; height: 26px; background: none;
+    border: 1px solid var(--border); border-radius: 5px;
+    color: var(--muted); cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .proc-table .del-btn:hover { background: var(--red); border-color: var(--red); color: #fff; }
+  .pid-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block; margin-right: 5px; flex-shrink: 0;
+  }
+
+  .btn-row { display: flex; gap: 8px; margin-top: 1rem; }
+  .btn {
+    padding: .55rem 1rem; border-radius: 8px; border: none;
+    cursor: pointer; font-family: 'Syne', sans-serif;
+    font-size: 0.82rem; font-weight: 600; transition: all .2s;
+  }
+  .btn-add { background: var(--surface2); border: 1px solid var(--border); color: var(--text); flex: 1; }
+  .btn-add:hover { border-color: var(--green); color: var(--green); }
+  .btn-run { background: var(--accent); color: #fff; flex: 2; }
+  .btn-run:hover { background: #3b7de8; transform: translateY(-1px); }
+  .btn-clear { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+  .btn-clear:hover { border-color: var(--red); color: var(--red); }
+
+  .output { padding: 1.5rem; overflow-y: auto; }
+  .placeholder {
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: var(--muted); gap: 1rem; text-align: center;
+  }
+  .placeholder .icon { font-size: 3rem; opacity: .3; }
+  .placeholder p { font-size: .85rem; font-family: 'JetBrains Mono', monospace; }
+
+  .gantt-label { font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: .8rem; }
+  .gantt-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem; overflow-x: auto; }
+  .gantt-row { display: flex; height: 40px; min-width: 600px; border-radius: 6px; overflow: hidden; margin-bottom: 4px; }
+  .gantt-block {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff;
+    border-right: 2px solid rgba(0,0,0,.3);
+    transition: opacity .15s; cursor: default;
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+  }
+  .gantt-block:hover { opacity: .85; }
+  .gantt-block:last-child { border-right: none; }
+  .gantt-ticks { display: flex; min-width: 600px; margin-top: 4px; position: relative; height: 18px; }
+  .gantt-tick { position: absolute; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: var(--muted); transform: translateX(-50%); }
+
+  .results-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+  .results-table th {
+    font-size: 0.65rem; font-family: 'JetBrains Mono', monospace;
+    color: var(--muted); text-align: right; padding: .6rem .8rem;
+    border-bottom: 1px solid var(--border); letter-spacing: 1px;
+  }
+  .results-table th:first-child { text-align: left; }
+  .results-table td {
+    padding: .55rem .8rem; text-align: right;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+    border-bottom: 1px solid rgba(42,53,85,.5);
+  }
+  .results-table td:first-child { text-align: left; font-weight: 600; }
+  .results-table tr:hover td { background: var(--surface2); }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .summary-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem;
+    text-align: center;
+  }
+  .summary-card .val { font-size: 1.6rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+  .summary-card .lbl { font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: .3rem; font-family: 'JetBrains Mono', monospace; }
+
+  .algo-badge {
+    display: inline-block; padding: .3rem .7rem;
+    background: rgba(79,142,247,.15); border: 1px solid rgba(79,142,247,.3);
+    border-radius: 20px; font-size: 0.72rem; font-family: 'JetBrains Mono', monospace;
+    color: var(--accent); margin-bottom: 1.2rem;
+  }
+
+  @media (max-width: 800px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚙</div>
+  <div>
+    <h1>CPU Process Scheduler</h1>
+    <span>// FCFS · SJF · SRTF · RR · Priority · HRRN</span>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="section-title">01 — Algorithm</div>
+    <div class="algo-grid">
+      <button class="algo-btn active" onclick="setAlgo('FCFS')">FCFS</button>
+      <button class="algo-btn" onclick="setAlgo('SJF')">SJF</button>
+      <button class="algo-btn" onclick="setAlgo('SRTF')">SRTF</button>
+      <button class="algo-btn" onclick="setAlgo('RR')">Round Robin</button>
+      <button class="algo-btn" onclick="setAlgo('PRIORITY')">Priority</button>
+      <button class="algo-btn" onclick="setAlgo('HRRN')">HRRN</button>
+    </div>
+
+    <div class="tq-row" id="tqRow" style="display:none">
+      <label>TIME QUANTUM:</label>
+      <input type="number" id="tq" value="2" min="1">
+    </div>
+
+    <div class="section-title">02 — Processes</div>
+    <table class="proc-table">
+      <thead>
+        <tr>
+          <th>PID</th>
+          <th>ARRIVAL</th>
+          <th>BURST</th>
+          <th id="priHead" style="display:none">PRIORITY</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="procBody"></tbody>
+    </table>
+
+    <div class="btn-row">
+      <button class="btn btn-add" onclick="addProcess()">+ Add Process</button>
+      <button class="btn btn-clear" onclick="clearAll()">✕</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-run" onclick="runScheduler()">▶ Run Scheduler</button>
+    </div>
+  </div>
+
+  <div class="output" id="output">
+    <div class="placeholder">
+      <div class="icon">📊</div>
+      <p>Add processes and click<br>Run Scheduler to see results</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROCESS_COLORS = ['#7c3aed','#059669','#dc2626','#2563eb','#d97706','#db2777','#0891b2','#65a30d'];
+let algo = 'FCFS';
+let procCount = 0;
+let processes = [];
+
+function setAlgo(a) {
+  algo = a;
+  document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tqRow').style.display = a === 'RR' ? 'flex' : 'none';
+  document.getElementById('priHead').style.display = (a === 'PRIORITY') ? '' : 'none';
+  document.querySelectorAll('.pri-cell').forEach(c => c.style.display = (a === 'PRIORITY') ? '' : 'none');
+}
+
+function addProcess() {
+  const idx = processes.length;
+  const color = PROCESS_COLORS[idx % PROCESS_COLORS.length];
+  const pid = 'P' + (idx + 1);
+  processes.push({ id: pid, color });
+
+  const tbody = document.getElementById('procBody');
+  const tr = document.createElement('tr');
+  tr.id = 'row_' + idx;
+  tr.innerHTML = `
+    <td style="display:flex;align-items:center;padding:.3rem .3rem">
+      <span class="pid-dot" style="background:${color}"></span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:.8rem">${pid}</span>
+    </td>
+    <td><input type="number" id="at_${idx}" value="${idx}" min="0" placeholder="0"></td>
+    <td><input type="number" id="bt_${idx}" value="${Math.floor(Math.random()*8)+2}" min="1" placeholder="1"></td>
+    <td class="pri-cell" style="display:${algo==='PRIORITY'?'':'none'}"><input type="number" id="pri_${idx}" value="${Math.floor(Math.random()*5)+1}" min="1" placeholder="1"></td>
+    <td><button class="del-btn" onclick="removeProcess(${idx})">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+  procCount++;
+}
+
+function removeProcess(idx) {
+  const row = document.getElementById('row_' + idx);
+  if (row) row.remove();
+}
+
+function clearAll() {
+  processes = [];
+  procCount = 0;
+  document.getElementById('procBody').innerHTML = '';
+  document.getElementById('output').innerHTML = `<div class="placeholder"><div class="icon">📊</div><p>Add processes and click<br>Run Scheduler to see results</p></div>`;
+}
+
+function getProcesses() {
+  const rows = document.querySelectorAll('#procBody tr');
+  const procs = [];
+  rows.forEach((row, i) => {
+    const idx = row.id.replace('row_', '');
+    const at = parseInt(document.getElementById('at_' + idx)?.value) || 0;
+    const bt = parseInt(document.getElementById('bt_' + idx)?.value) || 1;
+    const pri = parseInt(document.getElementById('pri_' + idx)?.value) || 1;
+    const pid = row.querySelector('span:last-of-type')?.textContent || ('P' + (i + 1));
+    const color = PROCESS_COLORS[i % PROCESS_COLORS.length];
+    procs.push({ pid, at, bt, pri, color, rem: bt, ct: 0, wt: 0, tat: 0 });
+  });
+  return procs;
+}
+
+function scheduleFCFS(procs) {
+  const sorted = [...procs].sort((a, b) => a.at - b.at);
+  const gantt = [];
+  let t = 0;
+  sorted.forEach(p => {
+    if (t < p.at) t = p.at;
+    gantt.push({ pid: p.pid, start: t, end: t + p.bt, color: p.color });
+    t += p.bt;
+    p.ct = t; p.tat = p.ct - p.at; p.wt = p.tat - p.bt;
+  });
+  return { gantt, procs: sorted };
+}
+
+function scheduleSJF(procs) {
+  const ps = procs.map(p => ({ ...p, rem: p.bt }));
+  const gantt = [];
+  let t = 0, done = [];
+  const remaining = [...ps];
+  while (remaining.length) {
+    const available = remaining.filter(p => p.at <= t).sort((a, b) => a.bt - b.bt);
+    if (!available.length) { t++; continue; }
+    const p = available[0];
+    remaining.splice(remaining.indexOf(p), 1);
+    gantt.push({ pid: p.pid, start: t, end: t + p.bt, color: p.color });
+    t += p.bt;
+    p.ct = t; p.tat = p.ct - p.at; p.wt = p.tat - p.bt;
+    done.push(p);
+  }
+  return { gantt, procs: done };
+}
+
+function scheduleSRTF(procs) {
+  const ps = procs.map(p => ({ ...p, rem: p.bt }));
+  const gantt = [];
+  let t = 0, done = 0;
+  const total = ps.reduce((s, p) => s + p.bt, 0);
+  const maxT = Math.max(...ps.map(p => p.at)) + total + 5;
+  while (done < ps.length && t < maxT) {
+    const available = ps.filter(p => p.at <= t && p.rem > 0).sort((a, b) => a.rem - b.rem);
+    if (!available.length) { t++; continue; }
+    const p = available[0];
+    if (gantt.length && gantt[gantt.length-1].pid === p.pid) gantt[gantt.length-1].end++;
+    else gantt.push({ pid: p.pid, start: t, end: t+1, color: p.color });
+    p.rem--; t++;
+    if (p.rem === 0) { p.ct = t; p.tat = p.ct - p.at; p.wt = p.tat - p.bt; done++; }
+  }
+  return { gantt, procs: ps };
+}
+
+function scheduleRR(procs, tq) {
+  const ps = procs.map(p => ({ ...p, rem: p.bt }));
+  ps.sort((a, b) => a.at - b.at);
+  const queue = [], inQueue = new Set(), gantt = [];
+  let t = 0, done = 0;
+  ps.filter(p => p.at === 0).forEach(p => { queue.push(p); inQueue.add(p.pid); });
+  while (done < ps.length) {
+    if (!queue.length) {
+      t++;
+      ps.filter(q => q.at <= t && q.rem > 0 && !inQueue.has(q.pid)).forEach(q => { queue.push(q); inQueue.add(q.pid); });
+      continue;
+    }
+    const p = queue.shift();
+    const run = Math.min(tq, p.rem);
+    gantt.push({ pid: p.pid, start: t, end: t + run, color: p.color });
+    const prev = t; t += run; p.rem -= run;
+    ps.filter(q => q.at > prev && q.at <= t && q.rem > 0 && !inQueue.has(q.pid)).forEach(q => { queue.push(q); inQueue.add(q.pid); });
+    if (p.rem === 0) { p.ct = t; p.tat = p.ct - p.at; p.wt = p.tat - p.bt; done++; }
+    else queue.push(p);
+  }
+  return { gantt, procs: ps };
+}
+
+function schedulePriority(procs) {
+  const ps = procs.map(p => ({ ...p, rem: p.bt }));
+  const gantt = [];
+  let t = 0, done = 0;
+  const maxT = Math.max(...ps.map(p => p.at)) + ps.reduce((s, p) => s + p.bt, 0) + 5;
+  while (done < ps.length && t < maxT) {
+    const available = ps.filter(p => p.at <= t && p.rem > 0).sort((a, b) => b.pri - a.pri);
+    if (!available.length) { t++; continue; }
+    const p = available[0];
+    if (gantt.length && gantt[gantt.length-1].pid === p.pid) gantt[gantt.length-1].end++;
+    else gantt.push({ pid: p.pid, start: t, end: t+1, color: p.color });
+    p.rem--; t++;
+    if (p.rem === 0) { p.ct = t; p.tat = p.ct - p.at; p.wt = p.tat - p.bt; done++; }
+  }
+  return { gantt, procs: ps };
+}
+
+function scheduleHRRN(procs) {
+  const ps = procs.map(p => ({ ...p }));
+  const gantt = [], done = [];
+  const remaining = [...ps];
+  let t = 0;
+  while (remaining.length) {
+    const available = remaining.filter(p => p.at <= t);
+    if (!available.length) { t++; continue; }
+    available.forEach(p => p.rr = (t - p.at + p.bt) / p.bt);
+    const p = available.sort((a, b) => b.rr - a.rr)[0];
+    remaining.splice(remaining.indexOf(p), 1);
+    gantt.push({ pid: p.pid, start: t, end: t + p.bt, color: p.color });
+    t += p.bt;
+    p.ct = t; p.tat = p.ct - p.at; p.wt = p.tat - p.bt;
+    done.push(p);
+  }
+  return { gantt, procs: done };
+}
+
+function runScheduler() {
+  const procs = getProcesses();
+  if (!procs.length) { alert('Please add at least one process!'); return; }
+  const tq = parseInt(document.getElementById('tq').value) || 2;
+  let result;
+  switch (algo) {
+    case 'FCFS': result = scheduleFCFS(procs); break;
+    case 'SJF': result = scheduleSJF(procs); break;
+    case 'SRTF': result = scheduleSRTF(procs); break;
+    case 'RR': result = scheduleRR(procs, tq); break;
+    case 'PRIORITY': result = schedulePriority(procs); break;
+    case 'HRRN': result = scheduleHRRN(procs); break;
+  }
+  renderOutput(result, algo, tq);
+}
+
+function renderOutput({ gantt, procs }, algo, tq) {
+  const totalTime = gantt[gantt.length-1].end - gantt[0].start;
+  const startT = gantt[0].start;
+  const avgWT = (procs.reduce((s, p) => s + p.wt, 0) / procs.length).toFixed(2);
+  const avgTAT = (procs.reduce((s, p) => s + p.tat, 0) / procs.length).toFixed(2);
+  const cpuUtil = ((procs.reduce((s, p) => s + p.bt, 0) / totalTime) * 100).toFixed(1);
+  const ticks = [...new Set(gantt.flatMap(g => [g.start, g.end]))].sort((a,b)=>a-b);
+
+  const ganttHTML = gantt.map(g => {
+    const w = ((g.end - g.start) / totalTime * 100).toFixed(2);
+    return `<div class="gantt-block" style="width:${w}%;background:${g.color}" title="${g.pid}: ${g.start}–${g.end}">${g.pid}</div>`;
+  }).join('');
+
+  const ticksHTML = ticks.map(t => {
+    const left = ((t - startT) / totalTime * 100).toFixed(2);
+    return `<span class="gantt-tick" style="left:${left}%">${t}</span>`;
+  }).join('');
+
+  const tableRows = procs.map(p =>
+    `<tr>
+      <td><span class="pid-dot" style="background:${p.color}"></span>${p.pid}</td>
+      <td>${p.at}</td><td>${p.bt}</td>
+      ${algo==='PRIORITY'?`<td>${p.pri}</td>`:''}
+      <td>${p.ct}</td>
+      <td style="color:${p.tat>avgTAT*1.5?'#ef4444':'var(--text)'}">${p.tat}</td>
+      <td style="color:${p.wt>avgWT*1.5?'#f59e0b':'var(--text)'}">${p.wt}</td>
+    </tr>`
+  ).join('');
+
+  document.getElementById('output').innerHTML = `
+    <div class="algo-badge">Algorithm: ${algo}${algo==='RR'?' | TQ = '+tq:''}</div>
+    <div class="gantt-label">Gantt Chart</div>
+    <div class="gantt-container">
+      <div class="gantt-row">${ganttHTML}</div>
+      <div class="gantt-ticks">${ticksHTML}</div>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-card"><div class="val">${avgWT}</div><div class="lbl">Avg Wait Time</div></div>
+      <div class="summary-card"><div class="val">${avgTAT}</div><div class="lbl">Avg Turnaround</div></div>
+      <div class="summary-card"><div class="val">${cpuUtil}%</div><div class="lbl">CPU Utilization</div></div>
+    </div>
+    <div class="gantt-label">Process Details</div>
+    <div class="gantt-container" style="overflow-x:auto">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>PID</th><th>AT</th><th>BT</th>
+            ${algo==='PRIORITY'?'<th>PRI</th>':''}
+            <th>CT</th><th>TAT</th><th>WT</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+addProcess(); addProcess(); addProcess();
+</script>
+</body>
+</html>
