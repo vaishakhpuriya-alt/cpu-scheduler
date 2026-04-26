@@ -3,7 +3,8 @@
 A web-based CPU scheduling simulator built with pure HTML, CSS, and JavaScript.
 
 ## 🚀 Live Demo
-👉 [Click here to open](https://vaishakhpuriya-alt.github.io/cpu-scheduler)
+👉 [Click here to open]
+(https://vaishakhpuriya-alt.github.io/cpu-scheduler)
 
 ## 📌 Features
 - Supports 6 scheduling algorithms
